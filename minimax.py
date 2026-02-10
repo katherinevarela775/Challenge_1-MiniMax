@@ -1,138 +1,183 @@
 import random
 import copy
+import os
+import time
 
 class Laberinto:
- def __init__(self, filas, columnas):
-    self.filas = filas 
-    self.columnas = columnas 
-    # Posiciones iniciales
-    self.gato_pos =  [0, 0] # Arriba a la izq.
-    self.raton_pos = [filas - 1, columnas - 1] # Abajo a la der.
+   def __init__(self, filas, columnas):
+      self.filas = filas 
+      self.columnas = columnas 
+      # Posiciones iniciales
+      self.gato_pos =  [0, 1] # Arriba a la izq.
+      self.raton_pos = [filas - 1, columnas - 1] # Abajo a la der.
+      self.salida_pos = [0, 0]
 
- def generar_tablero(self):
-    # Matriz llena de puntos
-    tablero = [["." for _ in range(self.columnas)] for _ in range(self.filas)]
-    # Ubica al gato al gato y raton en sus coord. iniciales (tablero[fila][columnas])
-    tablero[self.gato_pos[0]][self.gato_pos[1]] = "G"
-    tablero[self.raton_pos[0]][self.raton_pos[1]] = "R"
+   def generar_tablero(self):
+      # Matriz llena de puntos
+      tablero = [["." for _ in range(self.columnas)] for _ in range(self.filas)]
+      
+      # Dibujamos la salida
+      sf, sc = self.salida_pos
+      tablero[sf][sc] = "S"
 
-    return tablero
- def mostrar(self):
-    tablero_actual = self.generar_tablero()
-    for fila in tablero_actual:
-        print(" ".join(fila)) # Une los elementos con un espacio
-   
-    print("-" * 20) # Linea separadora de turnos
+      # 1. Ubicamos primero al ratón
+      tablero[self.raton_pos[0]][self.raton_pos[1]] = "R"
+      
+      # 2. Ubicamos al gato al final (si están en la misma posición, se verá la G)
+      tablero[self.gato_pos[0]][self.gato_pos[1]] = "G"
+      
+      return tablero
 
- def calcular_distancia(self):
-    # Dist. Manhattan, le ayuda al gato a saber si se acerca al raton
-    return abs(self.gato_pos[0] - self.raton_pos[0]) + abs(self.gato_pos[1]- self.raton_pos[1])
+   def mostrar(self, turno, modo_gato, modo_raton):
+   #Limpia la consola
+      os.system('cls' if os.name == 'nt' else 'clear')
+      print("╔══════════════════════════════════════════╗")
+      print(f"║ TURNO: {turno:2} | GATO: {modo_gato:7} | RATÓN: {modo_raton:7} ║")
+      print("╚══════════════════════════════════════════╝")
 
- def mover_raton_azar(self):
-    # El raton se mueve al azar
-    direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)] # Arriba, Abajo, Izq., Der.
+      tablero_actual = self.generar_tablero()
+      for fila in tablero_actual:
+         render = "".join(["🐱 " if c == "G" else "🐭 " if c == "R" else "🚪 " if c == "S" else "⬜ " for c in fila])
+         print(render)
+      print("=" * 44)
 
-    movimiento = random.choice(direcciones)
+   def calcular_distancia(self, pos_gato, pos_raton):
+      # Dist. Manhattan, le ayuda al gato a saber si se acerca al raton
+      return abs(self.gato_pos[0] - self.raton_pos[0]) + abs(self.gato_pos[1]- self.raton_pos[1])
 
-    nueva_f = self.raton_pos[0] + movimiento[0]
-    nueva_c = self.raton_pos[1] + movimiento[1]
+   def obtener_movimientos_legales(self,posicion):
+      posibles_movimientos = []
+      # Definimos las 4 direcciones: (delta_fila, delta_columna)
+      direcciones = [(-1, 0), (1, 0 ), (0, -1), (0, 1)]
+      for df, dc in direcciones:
+         nf, nc = posicion[0] + df, posicion[1] + dc
+         # Verificamos si la nueva posicion esta dentro de los limites
+         if 0 <= nf < self.filas and 0 <= nc < self.columnas:
+            posibles_movimientos.append([nf, nc])
 
-    # Validacion1: que no salga del terreno de juego
-    if 0 <= nueva_f < self.filas and 0 <= nueva_c < self.columnas:
-      self.raton_pos = [nueva_f, nueva_c]
+      return posibles_movimientos
 
- def mover_gato_simple(self):
-   # Aqui el gato intenta reducir distancia
-   direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-   mejor_movimiento = self.gato_pos
-   distancia_minima = float('inf')
+   def ha_terminado(self):
+   # 3. Condiciones de finalización según las nuevas pautas [cite: 29, 30]
+      if self.gato_pos == self.raton_pos:
+         return True, "GATO"
+      if self.raton_pos == self.salida_pos:
+         return True, "RATON"
+      return False, None
 
-   for d in direcciones:
-      f = self.gato_pos[0] + d[0]
-      c = self.gato_pos[1] + d[1]
+   def minimax (self, profundidad, es_maximizando):
+         terminado, ganador = self.ha_terminado()
+         if terminado:
+            if ganador == "RATON": return 1000 # Prioridad máxima escapar 
+            if ganador == "GATO": return -1000 # Prioridad máxima atrapar 
+         
+         if profundidad == 0:
+            # Evaluación: El ratón quiere distancia al gato y cercanía a la salida
+            dist_gato_raton = self.calcular_distancia(self.gato_pos, self.raton_pos)
+            dist_raton_salida = self.calcular_distancia(self.raton_pos, self.salida_pos)
+            return dist_gato_raton - (dist_raton_salida * 2)
 
-      if 0 <= f < self.filas and 0 <= c < self.columnas:
-         # Se simula la distancia en caso de movernos ahi
-         dist = abs(f - self.raton_pos[0]) + abs(c - self.raton_pos[1])
-         if dist < distancia_minima:
-            distancia_minima = dist
-            mejor_movimiento = [f, c]
+         if es_maximizando: # Turno del Ratón
+            mejor_valor = float('-inf')
+            for movimiento in self.obtener_movimientos_legales(self.raton_pos):
+                  simulacion = copy.deepcopy(self)
+                  simulacion.raton_pos = movimiento
+                  valor = simulacion.minimax(profundidad - 1, False)
+                  mejor_valor = max(mejor_valor, valor)
+            return mejor_valor
+         else: # Turno del Gato
+            mejor_valor = float('inf')
+            for movimiento in self.obtener_movimientos_legales(self.gato_pos):
+                  simulacion = copy.deepcopy(self)
+                  simulacion.gato_pos = movimiento
+                  valor = simulacion.minimax(profundidad - 1, True)
+                  mejor_valor = min(mejor_valor, valor)
+            return mejor_valor
 
-   self.gato_pos =  mejor_movimiento
+   def mover_raton_azar(self):
+      direcciones = self.obtener_movimientos_legales(self.raton_pos)
+      self.raton_pos = random.choice(direcciones)
 
- def obtener_movimientos_legales(self,posicion):
-   posibles_movimientos = []
-   # Definimos las 4 direcciones: (delta_fila, delta_columna)
-   direcciones = [(-1, 0), (1, 0 ), (0, -1), (0, 1)]
-   for d_f, d_c in direcciones:
-      nueva_f = posicion[0] + d_f
-      nueva_c = posicion[1] + d_c
-      # Verificamos si la nueva posicion esta dentro de los limites
-      if 0 <= nueva_f < self.filas and 0 <= nueva_c < self.columnas:
-         posibles_movimientos.append([nueva_f, nueva_c])
-   return posibles_movimientos 
 
- def minimax (self, profundidad, es_maximizando):
-   # Situacion 1: Uno de los personajes gano o se llego al limite de vision (profundidad)
-   if profundidad == 0 or self.gato_pos == self.raton_pos:
-      return self.calcular_distancia() # Retorna el valor actual
-
-   if es_maximizando: # Turno del Raton (quiere alejarse)
-      mejor_valor =  float('-inf')
-      for movimiento in self.obtener_movimientos_legales(self.raton_pos):
-         # Creamos una copia del juego para simular
-         simulacion = copy.deepcopy(self)
-         # 2. Mueve al ratón en el futuro
-         simulacion.raton_pos = movimiento
-         # 3. Preguntamos que hara el gato despues
-         valor = simulacion.minimax(profundidad - 1, False)
-         mejor_valor = max(mejor_valor, valor)
-         return mejor_valor
-
-   else: # Turno del Gato (quiere acercarse)
-      mejor_valor = float('inf')
-      for movimiento in self.obtener_movimientos_legales(self.gato_pos):
-         # 1. Copia el estado actual
-         simulacion = copy.deepcopy(self)
-         # 2. Mueve al gato en esa copia en el futuro
-         simulacion.gato_pos = movimiento
-         # 3. Preguntamos que hara el raton despues
-         valor = simulacion.minimax(profundidad - 1, True)
-         mejor_valor = min(mejor_valor, valor)
-         return mejor_valor
- def mover_raton_inteligente(self, profundidad):
-   mejor_puntuacion = float('-inf')
-   mejor_movimiento = self.raton_pos
+   def mover_raton_inteligente(self, profundidad):
+      mejor_puntuacion = float('-inf')
+      movimientos = self.obtener_movimientos_legales(self.raton_pos)
+      random.shuffle(movimientos) 
+      mejor_movimiento = self.raton_pos
 
    # Buscamos en la lista de movimientos validos
-   for mov in self.obtener_movimientos_legales(self.raton_pos):
-      copia = copy.deepcopy(self)
-      copia.raton_pos = mov
+      for mov in self.obtener_movimientos_legales(self.raton_pos):
+         copia = copy.deepcopy(self)
+         copia.raton_pos = mov
 
-     # El Raton pregunta: Si me muevo a esta posicion, que es lo peor que podria hacerme el gato?
-     # False significa que el siguiente turno en la simulacion es del Gato
-      puntuacion = copia.minimax(profundidad, False)
+         # El Raton pregunta: Si me muevo a esta posicion, que es lo peor que podria hacerme el gato?
+         # False significa que el siguiente turno en la simulacion es del Gato
+         puntuacion = copia.minimax(profundidad, False)
 
-     
+      
       if puntuacion > mejor_puntuacion:
          mejor_puntuacion = puntuacion
          mejor_movimiento = mov
-   self.raton_pos = mejor_movimiento
+      self.raton_pos = mejor_movimiento
 
-   # Crear juego
-juego = Laberinto(6, 6)
+   def mover_gato_azar(self):
+      movs = self.obtener_movimientos_legales(self.gato_pos)
+      self.gato_pos = random.choice(movs)
 
-# Turno de prueba
-print("Estado Inicial:")
-juego.mostrar()
+   def mover_gato_inteligente(self, profundidad):
+      mejor_puntuacion = float('inf')
+      movimientos = self.obtener_movimientos_legales(self.gato_pos)
+      random.shuffle(movimientos) 
+      mejor_movimiento = self.gato_pos
 
-print("El Ratón está pensando...")
-# El ratón usa profundidad 3 (ve 3 movimientos al futuro)
-juego.mover_raton_inteligente(3)
+      # Buscamos en la lista de movimientos validos
+      for mov in self.obtener_movimientos_legales(self.gato_pos):
+         copia = copy.deepcopy(self)
+         copia.gato_pos = mov
+         puntuacion = copia.minimax(profundidad, True)
 
-print("El Ratón se ha movido:")
-juego.mostrar()
+         if puntuacion < mejor_puntuacion:
+            mejor_puntuacion = puntuacion
+            mejor_movimiento = mov
+      self.gato_pos = mejor_movimiento
 
+def jugar_simulacion(tamano=8, despertar=5):
+   juego = Laberinto(tamano, tamano)
+   turno = 1
+   print("¡COMIENZA LA PERSECUCIÓN!")
+
+    # 4. Bucle infinito hasta que uno gane 
+   while True:
+      modo = "AZAR" if turno <= despertar else "GENIO"
+      juego.mostrar(turno, modo, modo)
+
+      # Turno del Ratón
+      if turno <= despertar: juego.mover_raton_azar()
+      else: juego.mover_raton_inteligente(profundidad=2)
+
+      terminado, ganador = juego.ha_terminado()
+      if terminado:
+         juego.mostrar(turno, modo, modo)
+         if ganador == "RATON": print("🧀 ¡EL RATÓN ESCAPÓ POR LA PUERTA!")
+         else: print("💀 ¡EL GATO ATRAPÓ AL RATÓN!")
+         break
+
+      # Turno del Gato
+      if turno <= despertar: juego.mover_gato_azar()
+      else: juego.mover_gato_inteligente(profundidad=2)
+
+      terminado, ganador = juego.ha_terminado()
+      if terminado:
+         juego.mostrar(turno, modo, modo)
+         if ganador == "GATO": print("💀 ¡EL GATO ATRAPÓ AL RATÓN!")
+         else: print("🧀 ¡EL RATÓN ESCAPÓ!")
+         break
+
+      turno += 1
+      time.sleep(0.4)
+
+# Iniciar la partida final
+jugar_simulacion(tamano=8, despertar=5) 
 
       
 
