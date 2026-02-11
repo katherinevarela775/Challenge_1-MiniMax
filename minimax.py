@@ -1,177 +1,171 @@
 import random, copy, os, time
 
 class Laberinto:
-    def __init__(self, dimension):
-        self.dimension = dimension
+    # Cambiamos 'dimension' por 'tamano' para que coincida con la llamada
+    def __init__(self, tamano):
+        self.tamano = tamano
         self.posicion_gato = [0, 1]
-        self.posicion_raton = [dimension - 1, dimension - 1]
+        self.posicion_raton = [tamano - 1, tamano - 1]
         self.posicion_salida = [0, 0]
         
-        self.historial_gato = []
-        self.historial_raton = []
         self.lista_quesos = []
         self.lista_paredes = []
         
+        # Generación del mapa
         while True:
             self.lista_paredes = []
             zonas_restringidas = [[0,0], [0,1], [1,0], [1,1], self.posicion_gato, self.posicion_raton]
-            
-            for _ in range((dimension * dimension) // 4):
-                pared_tentativa = [random.randint(0, dimension - 1), random.randint(0, dimension - 1)]
+            for _ in range((tamano * tamano) // 4):
+                pared_tentativa = [random.randint(0, tamano - 1), random.randint(0, tamano - 1)]
                 if pared_tentativa not in zonas_restringidas and pared_tentativa not in self.lista_paredes:
                     self.lista_paredes.append(pared_tentativa)
             
             if self.existe_camino_real(self.posicion_raton, self.posicion_salida):
-                self.lista_quesos = [] # Limpiar antes de llenar
+                self.lista_quesos = []
                 while len(self.lista_quesos) < 3:
-                    queso_tentativo = [random.randint(0, dimension - 1), random.randint(0, dimension - 1)]
-                    if queso_tentativo not in self.lista_paredes and queso_tentativo not in zonas_restringidas and queso_tentativo not in self.lista_quesos:
-                        self.lista_quesos.append(queso_tentativo)
+                    q = [random.randint(0, tamano - 1), random.randint(0, tamano - 1)]
+                    if q not in self.lista_paredes and q not in zonas_restringidas and q not in self.lista_quesos:
+                        self.lista_quesos.append(q)
                 break
 
     def existe_camino_real(self, inicio, fin):
-        cola_busqueda = [inicio]
-        nodos_visitados = [inicio]
-        for posicion in cola_busqueda:
-            if posicion == fin: return True
-            for vecino in self.obtener_movimientos_legales(posicion, [], es_gato=False):
-                if vecino not in nodos_visitados:
-                    nodos_visitados.append(vecino)
-                    cola_busqueda.append(vecino)
+        cola = [inicio]; visitados = [inicio]
+        for pos in cola:
+            if pos == fin: return True
+            for vecino in self.obtener_movimientos_legales(pos, [], es_gato=False):
+                if vecino not in visitados:
+                    visitados.append(vecino); cola.append(vecino)
         return False
 
     def obtener_movimientos_legales(self, posicion_actual, posicion_oponente, es_gato=True):
-        movimientos_validos = []
-        direcciones = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        for delta_fila, delta_col in direcciones:
-            nueva_fila = posicion_actual[0] + delta_fila
-            nueva_col = posicion_actual[1] + delta_col
-            
-            if 0 <= nueva_fila < self.dimension and 0 <= nueva_col < self.dimension:
-                punto_nuevo = [nueva_fila, nueva_col]
-                
-                if punto_nuevo not in self.lista_paredes:
-                    # CORRECCIÓN: El ratón NUNCA puede saltar sobre el gato
-                    if not es_gato and punto_nuevo == posicion_oponente:
-                        continue
-                    movimientos_validos.append(punto_nuevo)
-                    
-        random.shuffle(movimientos_validos)
-        return movimientos_validos
+        movs = []
+        for df, dc in [(-1,0), (1,0), (0,-1), (0,1)]:
+            nf, nc = posicion_actual[0]+df, posicion_actual[1]+dc
+            if 0 <= nf < self.tamano and 0 <= nc < self.tamano:
+                punto = [nf, nc]
+                if punto not in self.lista_paredes:
+                    if not es_gato and punto == posicion_oponente: continue
+                    movs.append(punto)
+        return movs
 
-    def mostrar_tablero(self, numero_turno, modo_gato, modo_raton):
+    def mostrar_tablero(self, turno, modo_g, modo_r):
         os.system('cls' if os.name == 'nt' else 'clear')
-        header = f"║ Turno: {numero_turno:2} | Gato: {modo_gato:6} | Ratón: {modo_raton:6} ║"
-        print(f"╔{'═' * (len(header)-2)}╗\n{header}\n╚{'═' * (len(header)-2)}╝")
-        
-        for fila_idx in range(self.dimension):
-            buffer_fila = ""
-            for col_idx in range(self.dimension):
-                punto_actual = [fila_idx, col_idx]
-                if punto_actual == self.posicion_gato: buffer_fila += "🐱 "
-                elif punto_actual == self.posicion_raton: buffer_fila += "🐭 "
-                elif punto_actual == self.posicion_salida: buffer_fila += "🚪 "
-                elif punto_actual in self.lista_quesos: buffer_fila += "🧀 "
-                elif punto_actual in self.lista_paredes: buffer_fila += "⬛ "
-                else: buffer_fila += "⬜ "
-            print(buffer_fila)
+        print(f"╔═════════════════════════════════════════════════╗")
+        print(f"║ TURNO: {turno:2}  | GATO: {modo_g:8} | RATÓN: {modo_r:8} ║")
+        print(f"╚═════════════════════════════════════════════════╝")
+        for f in range(self.tamano):
+            fila = ""
+            for c in range(self.tamano):
+                p = [f, c]
+                if p == self.posicion_gato: fila += "🐱 "
+                elif p == self.posicion_raton: fila += "🐭 "
+                elif p == self.posicion_salida: fila += "🚪 "
+                elif p in self.lista_quesos: fila += "🧀 "
+                elif p in self.lista_paredes: fila += "⬛ "
+                else: fila += "⬜ "
+            print(fila)
 
-    def minimax(self, profundidad, es_maximizando):
-        # CORRECCIÓN: Penalizaciones mucho más fuertes para evitar colisiones lógicas
-        if self.posicion_gato == self.posicion_raton: return -5000 
+    def minimax(self, profundidad, es_max):
+        if self.posicion_gato == self.posicion_raton: return -5000
         if self.posicion_raton == self.posicion_salida: return 5000
-        
         if profundidad == 0:
-            dist_gato_raton = abs(self.posicion_gato[0] - self.posicion_raton[0]) + abs(self.posicion_gato[1] - self.posicion_raton[1])
-            dist_raton_salida = abs(self.posicion_raton[0] - self.posicion_salida[0]) + abs(self.posicion_raton[1] - self.posicion_salida[1])
-            
-            penalidad_raton = self.historial_raton.count(self.posicion_raton) * 150
-            penalidad_gato = self.historial_gato.count(self.posicion_gato) * 150
+            d_gr = abs(self.posicion_gato[0]-self.posicion_raton[0]) + abs(self.posicion_gato[1]-self.posicion_raton[1])
+            d_rs = abs(self.posicion_raton[0]-self.posicion_salida[0]) + abs(self.posicion_raton[1]-self.posicion_salida[1])
+            return (d_gr * 2) - (d_rs * 4) if es_max else (d_gr * 10)
 
-            if es_maximizando: 
-                dist_queso = min([abs(self.posicion_raton[0]-q[0]) + abs(self.posicion_raton[1]-q[1]) for q in self.lista_quesos]) if self.lista_quesos else 0
-                return (dist_gato_raton * 2) - (dist_raton_salida * 4) - (dist_queso * 2) - penalidad_raton
-            else: 
-                # CORRECCIÓN: El gato ahora prioriza cerrar la distancia agresivamente
-                return (dist_gato_raton * 10) + penalidad_gato
+        mejor = float('-inf') if es_max else float('inf')
+        yo = self.posicion_raton if es_max else self.posicion_gato
+        rival = self.posicion_gato if es_max else self.posicion_raton
+        for m in self.obtener_movimientos_legales(yo, rival, es_gato=not es_max):
+            sim = copy.deepcopy(self)
+            if es_max: sim.posicion_raton = m
+            else: sim.posicion_gato = m
+            val = sim.minimax(profundidad - 1, not es_max)
+            mejor = max(mejor, val) if es_max else min(mejor, val)
+        return mejor
 
-        if es_maximizando:
-            mejor_valor = float('-inf')
-            for movimiento in self.obtener_movimientos_legales(self.posicion_raton, self.posicion_gato, es_gato=False):
-                estado_simulado = copy.deepcopy(self)
-                estado_simulado.posicion_raton = movimiento
-                valor_obtenido = estado_simulado.minimax(profundidad - 1, False)
-                mejor_valor = max(mejor_valor, valor_obtenido)
-            return mejor_valor
-        else:
-            mejor_valor = float('inf')
-            for movimiento in self.obtener_movimientos_legales(self.posicion_gato, self.posicion_raton, es_gato=True):
-                estado_simulado = copy.deepcopy(self)
-                estado_simulado.posicion_gato = movimiento
-                valor_obtenido = estado_simulado.minimax(profundidad - 1, True)
-                mejor_valor = min(mejor_valor, valor_obtenido)
-            return mejor_valor
-
-    def ejecutar_movimiento_ia(self, es_raton, profundidad):
-        mejor_puntuacion = float('-inf') if es_raton else float('inf')
-        posicion_actual = self.posicion_raton if es_raton else self.posicion_gato
-        mejor_movimiento = posicion_actual
-        
-        movimientos = self.obtener_movimientos_legales(posicion_actual, self.posicion_gato if es_raton else self.posicion_raton, es_gato=(not es_raton))
-        
-        for movimiento in movimientos:
-            simulacion = copy.deepcopy(self)
-            if es_raton: simulacion.posicion_raton = movimiento
-            else: simulacion.posicion_gato = movimiento
-            
-            puntuacion = simulacion.minimax(profundidad, not es_raton)
-            if (es_raton and puntuacion > mejor_puntuacion) or (not es_raton and puntuacion < mejor_puntuacion):
-                mejor_puntuacion, mejor_movimiento = puntuacion, movimiento
-        
+    def mover_ia(self, es_raton):
+        mejor_p = float('-inf') if es_raton else float('inf')
+        yo = self.posicion_raton if es_raton else self.posicion_gato
+        rival = self.posicion_gato if es_raton else self.posicion_raton
+        mejor_m = yo
+        for m in self.obtener_movimientos_legales(yo, rival, es_gato=not es_raton):
+            sim = copy.deepcopy(self)
+            if es_raton: sim.posicion_raton = m
+            else: sim.posicion_gato = m
+            p = sim.minimax(3, not es_raton)
+            if (es_raton and p > mejor_p) or (not es_raton and p < mejor_p):
+                mejor_p, mejor_m = p, m
         if es_raton:
-            self.posicion_raton = mejor_movimiento
+            self.posicion_raton = mejor_m
             if self.posicion_raton in self.lista_quesos: self.lista_quesos.remove(self.posicion_raton)
-            self.historial_raton = (self.historial_raton + [list(mejor_movimiento)])[-4:]
-        else:
-            self.posicion_gato = mejor_movimiento
-            self.historial_gato = (self.historial_gato + [list(mejor_movimiento)])[-4:]
+        else: self.posicion_gato = mejor_m
 
-def jugar_simulacion(tamano=10, turnos_azar=4, limite_turnos=40):
-    juego = Laberinto(tamano)
-    for turno in range(1, limite_turnos + 1):
-        modo = "AZAR" if turno <= turnos_azar else "GENIO"
-        juego.mostrar_tablero(turno, modo, modo)
+def manual(juego, pos, rival, es_g):
+    while True:
+        muda = input(f"\n Mover {'GATO' if es_g else 'RATÓN'} (W/A/S/D): ").lower()
+        d = {'w':(-1,0), 's':(1,0), 'a':(0,-1), 'd':(0,1)}
+        if muda in d:
+            n = [pos[0]+d[muda][0], pos[1]+d[muda][1]]
+            if n in juego.obtener_movimientos_legales(pos, rival, es_g): return n
+        print(" Movimiento no válido.")
+
+def jugar():
+    # Configuración inicial
+    LIMITE_TURNOS = 80
+    TAMANO_TABLERO = 10
+    historial_estados = {}
+    
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("--- CAT & MOUSE: THE CHASE ---")
+    print("1. Jugar como RATÓN\n2. Jugar como GATO\n3. Modo ESPECTADOR")
+    op = input("\nSelecciona una opción (1, 2 o 3): ")
+    
+    j = Laberinto(tamano=TAMANO_TABLERO)
+    
+    for t in range(1, LIMITE_TURNOS + 1):
+        # 1. Detección de Bucles / Empate por repetición
+        estado_actual = (tuple(j.posicion_gato), tuple(j.posicion_raton))
+        historial_estados[estado_actual] = historial_estados.get(estado_actual, 0) + 1
         
-        # Turno del Ratón
-        if turno <= turnos_azar:
-            movs = juego.obtener_movimientos_legales(juego.posicion_raton, juego.posicion_gato, es_gato=False)
-            if movs: juego.posicion_raton = random.choice(movs)
-        else:
-            juego.ejecutar_movimiento_ia(es_raton=True, profundidad=3)
+        if historial_estados[estado_actual] >= 3:
+            j.mostrar_tablero(t, "EMPATE", "EMPATE")
+            print(f"\n🤝 EMPATE: Se detectó un patrón repetitivo en las posiciones {estado_actual}.")
+            return
+
+        # 2. Definición de modos para mostrar en pantalla
+        m_r = "JUGADOR" if op == "1" else "GENIO"
+        m_g = "JUGADOR" if op == "2" else "GENIO"
         
-        if juego.posicion_raton == juego.posicion_salida:
-            juego.mostrar_tablero(turno, modo, modo)
+        j.mostrar_tablero(t, m_g, m_r)
+
+        # 3. Turno del Ratón
+        if op == "1": 
+            j.posicion_raton = manual(j, j.posicion_raton, j.posicion_gato, False)
+            if j.posicion_raton in j.lista_quesos: j.lista_quesos.remove(j.posicion_raton)
+        else: 
+            j.mover_ia(True)
+        
+        if j.posicion_raton == j.posicion_salida:
+            j.mostrar_tablero(t, m_g, m_r)
             print("🧀 ¡VICTORIA! El ratón escapó por la puerta."); return
-        if juego.posicion_gato == juego.posicion_raton:
-            juego.mostrar_tablero(turno, modo, modo)
+
+        # 4. Turno del Gato
+        j.mostrar_tablero(t, m_g, m_r)
+        if op == "2": 
+            j.posicion_gato = manual(j, j.posicion_gato, j.posicion_raton, True)
+        else: 
+            if op == "3": time.sleep(0.4) # Pausa para ver los movimientos en modo espectador
+            j.mover_ia(False)
+
+        if j.posicion_gato == j.posicion_raton:
+            j.mostrar_tablero(t, m_g, m_r)
             print("💀 ¡GAME OVER! El gato atrapó al ratón."); return
 
-        # Turno del Gato
-        juego.mostrar_tablero(turno, modo, modo)
-        if turno <= turnos_azar:
-            movs = juego.obtener_movimientos_legales(juego.posicion_gato, juego.posicion_raton, es_gato=True)
-            if movs: juego.posicion_gato = random.choice(movs)
-        else:
-            juego.ejecutar_movimiento_ia(es_raton=False, profundidad=3)
-            
-        if juego.posicion_gato == juego.posicion_raton:
-            juego.mostrar_tablero(turno, modo, modo)
-            print("💀 ¡GAME OVER! El gato atrapó al ratón."); return
-        
-        time.sleep(0.8)
-    print("🤝 EMPATE: Se agotó el tiempo de persecución.")
+    print("\n🤝 EMPATE: Se alcanzó el límite máximo de turnos.")
 
-jugar_simulacion(tamano=10, turnos_azar=2, limite_turnos=40)
+if __name__ == "__main__":
+    jugar()
 
 
 
